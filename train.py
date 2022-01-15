@@ -85,8 +85,8 @@ def compute_nme(preds, target, dataset, typeerr='inter-ocular'):
             eye_distant = np.linalg.norm(pts_gt[l[0]:l[1]].mean() - pts_gt[r[0]:r[1]].mean())
         else:
             eye_distant = np.linalg.norm(pts_gt[l] - pts_gt[r])
-        rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (eye_distant)
-
+        # rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (eye_distant)
+        rmse[i] = np.sum(np.mean(np.linalg.norm(pts_pred - pts_gt, axis=1), axis=0) / eye_distant)
     return rmse
 
 
@@ -137,7 +137,8 @@ def train_one_epoch(traindataloader, model, optimizer, epoch, args=None):
         optimizer.step()
 
         losses.update(loss.item())
-        print(f"Epoch:{epoch}. Lr:{optimizer.param_groups[0]['lr']} Batch {i} / {num_batch} batches. Loss: {loss.item()}")
+        if i % 10 == 0:
+            print(f"Epoch:{epoch}. Lr:{optimizer.param_groups[0]['lr']} Batch {i} / {num_batch} batches. Loss: {loss.item()}")
 
     return losses.avg
 
@@ -218,12 +219,13 @@ def validate(valdataloader, model, optimizer, epoch, args):
 
         losses.update(loss.item())
         message = f"VAldiation Epoch:{epoch}. Lr:{optimizer.param_groups[0]['lr']} Batch {batch} / {num_batch} batches. Loss: {loss.item()}.  NME_ocular :{np.mean(nme_interocular_batch)}. NME_pupil :{np.mean(nme_interpupil_batch)}"
-        print(message)
+        if batch % 10 == 0:
+            print(message)
     
     message = f" Epoch:{epoch}. Lr:{optimizer.param_groups[0]['lr']}. Loss :{losses.avg}. NME_ocular :{np.mean(nme_interocular)}. NME_pupil :{np.mean(nme_interpupil)}"
     logFile.write(message + "\n")
 
-    return losses.avg
+    return losses.avg, np.mean(nme_interocular)
 
 
 ## Visualization
@@ -275,7 +277,8 @@ def main(args):
     elif args.dataset == "300w":
         train_dataset = F300WDataset(data_dir=args.dataroot, split=args.train_split, augment=True, transforms=transform)
         val_dataset = F300WDataset(data_dir=args.dataroot, split=args.val_split)
-
+    print("No. train images", len(train_dataset))
+    print("No. val images", len(val_dataset))
     # Dataloader
     traindataloader = DataLoader(
         train_dataset,
@@ -304,15 +307,19 @@ def main(args):
     os.makedirs(args.snapshot, exist_ok=True)
     # for im, lm in train_dataset:
     #     print(type(im), lm.shape)
-
+    
     if args.mode == 'train':
-        for epoch in range(100000):
+        best_nme = 999
+        for epoch in range(args.n_epochs):
             train_one_epoch(traindataloader, model, optimizer, epoch, args)
-            validate(validdataloader, model, optimizer, epoch, args)
-            save_checkpoint({
-                'epoch': epoch,
-                'plfd_backbone': model.state_dict()
-            }, filename=f'{args.snapshot}/epoch_{epoch}.pth.tar')
+            _, nme = validate(validdataloader, model, optimizer, epoch, args)
+            if nme < best_nme:
+                best_nme = nme
+                nme = "{:.6f}".format(nme)
+                save_checkpoint({
+                    'epoch': epoch,
+                    'plfd_backbone': model.state_dict()
+                }, filename=f'{args.snapshot}/epoch_{epoch}_nme_{nme}.pth.tar')
             scheduler.step()
     else:  # inference mode
         validate(validdataloader, model, optimizer, -1, args)
@@ -360,7 +367,7 @@ def parse_args():
         '--val-split',
         default='full',
         type=str)
-
+    parser.add_argument('--n_epochs', default=150, type=int)
     parser.add_argument('--train_batchsize', default=16, type=int)
     parser.add_argument('--val_batchsize', default=8, type=int)
     parser.add_argument('--get_topk_in_pred_heats_training', default=0, type=int)

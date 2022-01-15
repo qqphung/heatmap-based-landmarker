@@ -12,15 +12,35 @@ try:
 except:
     from dataLAPA106 import transformerr, category_ids, square_box
 
+class FaceLMHorizontalFlip(object):
+    def __init__(self, p, points_flip):
+        super().__init__()
+        self.p = p
+        self.points_flip = points_flip
+    
+    def __call__(self, image, target):
+        if random.random() > self.p:
+            image = cv2.flip(image, 1)
+            # image = image.transpose(Image.FLIP_LEFT_RIGHT)
+            target = target[self.points_flip, :]
+            target[:,0] = 1-target[:,0]
+            return image, target
+        else:
+            return image, target
+
+points_flip = [17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 28, 29, 30, 31, 36, 35, 34, 33, 32, 46, 45, 44, 43, 48, 47, 40, 39, 38, 37, 42, 41, 55, 54, 53, 52, 51, 50, 49, 60, 59, 58, 57, 56, 65, 64, 63, 62, 61, 68, 67, 66]
+points_flip = (np.array(points_flip)-1).tolist()
+
 class F300WDataset(data.Dataset):
     TARGET_IMAGE_SIZE = (256, 256)
-
+    
     def __init__(self, data_dir, split, augment=False, transforms=None):
         self.data_dir = data_dir
         
         self.augment = augment
         self.transforms = transforms
-        
+        self.flip_aug = FaceLMHorizontalFlip(p=0.5, points_flip=points_flip)
+
         split_filename = os.path.join(self.data_dir, split + ".txt")
         with open(split_filename, "r") as f:
             self.img_path_list = [x.strip() for x in f.readlines()]
@@ -78,12 +98,13 @@ class F300WDataset(data.Dataset):
 
 
         # If fail then get the default item
-        if np.min(landmark[:,0]) < 0 or \
-           np.min(landmark[:,1]) < 0 or \
-           np.max(landmark[:,0]) >= img.shape[1]  or \
-           np.max(landmark[:,1]) >= img.shape[0] :
-           print("Get default itemmmmmmmmmmmmmmmmm!")
-           return self.__get_default_item()
+        # if np.min(landmark[:,0]) < 0 or \
+        #    np.min(landmark[:,1]) < 0 or \
+        #    np.max(landmark[:,0]) >= img.shape[1]  or \
+        #    np.max(landmark[:,1]) >= img.shape[0] :
+        #    print("Get default itemmmmmmmmmmmmmmmmm!")
+        #    return self.__get_default_item()
+        # landmark[landmark < 0] = 0
 
         # Round box in case box out of range
         x1, y1, x2, y2 = box
@@ -94,7 +115,23 @@ class F300WDataset(data.Dataset):
         box = [x1, y1, x2, y2]
 
         if self.augment:
-            transformed = transformerr(image=img, bboxes=[box], category_ids=category_ids, keypoints=landmark)
+            # Flip augmentation
+            img, landmark = self.flip_aug(img, landmark)
+
+            # Mask for invalid landmark
+            mask_landmark = np.zeros_like(landmark)
+            mask_landmark[landmark < 0] = 1.0
+            mask_landmark[:, 0][landmark[:, 0] >= img.shape[1]] = 1.0
+            mask_landmark[:, 1][landmark[:, 1] >= img.shape[0]] = 1.0
+
+            # Clean landmark before do augmentation
+            clean_landmark = landmark.copy()
+            clean_landmark[clean_landmark < 0] = 0
+            clean_landmark[:, 0][clean_landmark[:, 0] >= img.shape[1]] = img.shape[1] - 1
+            clean_landmark[:, 1][clean_landmark[:, 1] >= img.shape[0]] = img.shape[0] - 1
+
+            # Do augmentation
+            transformed = transformerr(image=img, bboxes=[box], category_ids=category_ids, keypoints=clean_landmark)
             imgT = np.array(transformed["image"])
             boxes = np.array(transformed["bboxes"])
             lmks = np.array(transformed["keypoints"])
@@ -105,6 +142,8 @@ class F300WDataset(data.Dataset):
             if (augment_sucess):
                 imgT = imgT
                 box = boxes[0]
+                # Update invalid landmark
+                lmks[mask_landmark > 0] = landmark[mask_landmark > 0]
                 lmks = lmks
             else:
                 # print("Augment not success!!!!!!!!")

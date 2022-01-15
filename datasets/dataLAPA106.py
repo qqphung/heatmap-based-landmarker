@@ -38,6 +38,8 @@ transformerr = A.Compose(
 # )
 
 
+
+
 def square_box(box, ori_shape, lmks, expand=1.25):
     """
     \Square the box with expandsion
@@ -99,7 +101,8 @@ class LAPA106DataSet(data.Dataset):
         self.anno_dir = anno_dir
         self.transforms = transforms
         self.augment = augment
-        self.img_path_list = glob.glob(img_dir + "/*.png")
+        self.img_path_list = glob.glob(img_dir + "/*.jpg")
+        print(img_dir)
 
     
     def _get_106_landmarks(self, path):

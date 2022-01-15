@@ -216,6 +216,7 @@ def lmks2heatmap(lmks, random_round=False, random_round_with_gaussian=False):
     heatmap = torch.rand((lmks.shape[0],lmks.shape[1], ow, oh))
     for i in range(lmks.shape[0]):  # num_lmks
         for j in range(lmks.shape[1]):
+            # if lmks[i][j][0] < 0 or lmks[i][j][1] < 0 or lmks[i][j][0] >= w or lmks[i][j][1] >= h: continue
             heatmap[i][j] = coord2heatmap(w, h, ow, oh, lmks[i][j][0], lmks[i][j][1], random_round=random_round, random_round_with_gaussian=random_round_with_gaussian)
     
     return heatmap
