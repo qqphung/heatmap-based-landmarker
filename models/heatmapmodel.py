@@ -259,12 +259,12 @@ class BinaryHeatmap2Coordinate(nn.Module):
 class HeatmapHead(nn.Module):
     """HeatmapHead
     """
-    def __init__(self):
+    def __init__(self, out_channels=106):
         super(HeatmapHead, self).__init__()
 
         self.decoder = BinaryHeatmap2Coordinate(topk=18, stride=4)
 
-        self.head = BinaryHeadBlock(in_channels=152, proj_channels=152, out_channels=106)
+        self.head = BinaryHeadBlock(in_channels=152, proj_channels=152, out_channels=out_channels)
 
     def forward(self, input):
         binary_heats = self.head(input)
@@ -277,12 +277,12 @@ class HeatmapHead(nn.Module):
         return binary_heats, lmks
         
 class HeatMapLandmarker(nn.Module):
-    def __init__(self, pretrained=False, model_url=None):
+    def __init__(self, out_channels=106, pretrained=False, model_url=None):
         super(HeatMapLandmarker, self).__init__()
         self.backbone = mobilenetv2(pretrained=pretrained, model_url=model_url)
-        self.heatmap_head = HeatmapHead()
+        self.heatmap_head = HeatmapHead(out_channels)
         self.transform = transforms.Compose([
-            transforms.Resize(256, 256),
+            transforms.Resize((256, 256),transforms.InterpolationMode.BICUBIC),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
         ])

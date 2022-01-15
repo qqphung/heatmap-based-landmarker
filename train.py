@@ -13,7 +13,7 @@ import sys
 from models.heatmapmodel import HeatMapLandmarker,\
      heatmap2coord, heatmap2topkheatmap, lmks2heatmap, loss_heatmap, cross_loss_entropy_heatmap,\
                      heatmap2softmaxheatmap, heatmap2sigmoidheatmap, adaptive_wing_loss
-from datasets.dataLAPA106 import LAPA106DataSet
+from datasets import LAPA106DataSet, F300WDataset
 from torchvision import  transforms
 
 
@@ -52,7 +52,7 @@ def save_checkpoint(state, filename='checkpoint.pth.tar'):
     print(f'Save checkpoint to {filename}')
 
 
-def compute_nme(preds, target, typeerr='inter-ocular'):
+def compute_nme(preds, target, dataset, typeerr='inter-ocular'):
     """ preds/target:: numpy array, shape is (N, L, 2)
         N: batchsize L: num of landmark 
     """
@@ -67,9 +67,15 @@ def compute_nme(preds, target, typeerr='inter-ocular'):
     rmse = np.zeros(N)
 
     if typeerr=='inter-ocular':
-        l, r = 66, 79
+        if dataset == "lapa":
+            l, r = 66, 79
+        elif dataset == "300w":
+            l, r = 36, 45
     else:
-        l, r = 104, 105
+        if dataset == "lapa":
+            l, r = 104, 105
+        elif dataset == "300w":
+            l, r = 36, 45
 
     for i in range(N):
         pts_pred, pts_gt = preds[i, ], target[i, ]
@@ -198,8 +204,8 @@ def validate(valdataloader, model, optimizer, epoch, args):
 
 
         # Loss
-        nme_interocular_batch = list(compute_nme(lmksPRED, lmksGT, typeerr='inter-ocular'))
-        nme_interpupil_batch = list(compute_nme(lmksPRED, lmksGT, typeerr='inter-pupil'))
+        nme_interocular_batch = list(compute_nme(lmksPRED, lmksGT, args.dataset, typeerr='inter-ocular'))
+        nme_interpupil_batch = list(compute_nme(lmksPRED, lmksGT, args.dataset, typeerr='inter-pupil'))
 
 
         nme_interocular += nme_interocular_batch
@@ -243,23 +249,28 @@ def vis_prediction_batch(batch, img, lmk, output="./vis"):
 
 def main(args):
     # Init model
-    model = HeatMapLandmarker(pretrained=True, model_url="https://www.dropbox.com/s/47tyzpofuuyyv1b/mobilenetv2_1.0-f2a8633.pth.tar?dl=1")
+    out_channels = 106
+    if args.dataset == "300w":
+        out_channels = 68
+    model = HeatMapLandmarker(out_channels=out_channels, pretrained=True, model_url="https://www.dropbox.com/s/47tyzpofuuyyv1b/mobilenetv2_1.0-f2a8633.pth.tar?dl=1")
     
     if args.resume != "":
         checkpoint = torch.load(args.resume, map_location=device)
         model.load_state_dict(checkpoint['plfd_backbone'])
         model.to(device)
 
-    
-    
     model.to(device)
 
-  
-
     # Train dataset, valid dataset
-    train_dataset = LAPA106DataSet(img_dir=f'{args.dataroot}/images', anno_dir=f'{args.dataroot}/landmarks', augment=True,
-    transforms=transform)
-    val_dataset = LAPA106DataSet(img_dir=f'{args.val_dataroot}/images', anno_dir=f'{args.val_dataroot}/landmarks')
+    train_dataset, val_dataset = None, None
+    
+    if args.dataset == "lapa":
+        train_dataset = LAPA106DataSet(img_dir=f'{args.dataroot}/images', anno_dir=f'{args.dataroot}/landmarks', augment=True,
+        transforms=transform)
+        val_dataset = LAPA106DataSet(img_dir=f'{args.val_dataroot}/images', anno_dir=f'{args.val_dataroot}/landmarks')
+    elif args.dataset == "300w":
+        train_dataset = F300WDataset(data_dir=args.dataroot, split=args.train_split, augment=True, transforms=transform)
+        val_dataset = F300WDataset(data_dir=args.dataroot, split=args.val_split)
 
     # Dataloader
     traindataloader = DataLoader(
@@ -285,8 +296,8 @@ def main(args):
         lr=args.lr,
         weight_decay=1e-6)
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size ,gamma=args.gamma)
-    
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+    os.makedirs(args.snapshot, exist_ok=True)
     # for im, lm in train_dataset:
     #     print(type(im), lm.shape)
 
@@ -319,15 +330,33 @@ def parse_args():
 
     # --dataset
     parser.add_argument(
+        '--dataset',
+        default='lapa',
+        required=True,
+        help='lapa, 300w',
+        type=str
+    )
+    parser.add_argument(
         '--dataroot',
         default='/media/vuthede/7d50b736-6f2d-4348-8cb5-4c1794904e86/home/vuthede/data/LaPa/train',
         type=str,
         metavar='PATH')
+    # For lapa
     parser.add_argument(
         '--val_dataroot',
         default='/media/vuthede/7d50b736-6f2d-4348-8cb5-4c1794904e86/home/vuthede/data/LaPa/val',
         type=str,
         metavar='PATH')
+    # For f300w
+    parser.add_argument(
+        '--train-split',
+        default='train',
+        type=str)
+    parser.add_argument(
+        '--val-split',
+        default='full',
+        type=str)
+
     parser.add_argument('--train_batchsize', default=16, type=int)
     parser.add_argument('--val_batchsize', default=8, type=int)
     parser.add_argument('--get_topk_in_pred_heats_training', default=0, type=int)
@@ -341,11 +370,6 @@ def parse_args():
 
     parser.add_argument('--random_round_with_gaussian', default=1, type=int)
     parser.add_argument('--mode', default='train', type=str)
-
-
-
-
-
     
     args = parser.parse_args()
     return args

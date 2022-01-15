@@ -1,0 +1,5 @@
+*.pyc
+save/*
+vis/*
+checkpoint/*
+landmarkerData.tar.gz

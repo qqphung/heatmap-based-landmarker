@@ -1,15 +1,15 @@
 import numpy as np
 import cv2
 import sys
-sys.path.append('..')
+# sys.path.append('..')
 
 from torch.utils import data
 import glob
 import os
-import mxnet as mx
+# import mxnet as mx
 
 import albumentations as A
-import imgaug.augmenters as iaa
+# import imgaug.augmenters as iaa
 from torchvision import  transforms
 import ast
 import random
@@ -99,7 +99,7 @@ class LAPA106DataSet(data.Dataset):
         self.anno_dir = anno_dir
         self.transforms = transforms
         self.augment = augment
-        self.img_path_list = glob.glob(img_dir + "/*.jpg")
+        self.img_path_list = glob.glob(img_dir + "/*.png")
 
     
     def _get_106_landmarks(self, path):
@@ -369,8 +369,8 @@ if __name__ == "__main__":
     transform = transforms.Compose([transforms.ToTensor(),
     transforms.Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])])
 
-    lapa = LAPA106DataSet(img_dir="/media/vuthede/7d50b736-6f2d-4348-8cb5-4c1794904e86/home/vuthede/data/LaPa/train/images",
-                            anno_dir="/media/vuthede/7d50b736-6f2d-4348-8cb5-4c1794904e86/home/vuthede/data/LaPa/train/landmarks",
+    lapa = LAPA106DataSet(img_dir="/home/ubuntu/A-Practical-Facial-Landmark-Detector/data/train_data/imgs",
+                            anno_dir="/home/ubuntu/A-Practical-Facial-Landmark-Detector/data/test_data/imgs",
                             augment=True,
                             transforms=None)
     
@@ -384,13 +384,13 @@ if __name__ == "__main__":
 
             img = cv2.circle(img, tuple(p), 1, (255, 0, 0), 1)
         
-        cv2.imshow("Imgae", img)
+        cv2.imwrite("save/Imgae", img)
 
-        k = cv2.waitKey(0)
+        # k = cv2.waitKey(0)
 
         if k==27:
             break
     
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
 
         
