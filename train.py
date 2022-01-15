@@ -75,12 +75,16 @@ def compute_nme(preds, target, dataset, typeerr='inter-ocular'):
         if dataset == "lapa":
             l, r = 104, 105
         elif dataset == "300w":
-            l, r = 36, 45
+            l, r = [36, 42], [42, 48]
 
     for i in range(N):
         pts_pred, pts_gt = preds[i, ], target[i, ]
 
-        eye_distant = np.linalg.norm(pts_gt[l ] - pts_gt[r])
+        eye_distant = None
+        if isinstance(l, list):
+            eye_distant = np.linalg.norm(pts_gt[l[0]:l[1]].mean() - pts_gt[r[0]:r[1]].mean())
+        else:
+            eye_distant = np.linalg.norm(pts_gt[l] - pts_gt[r])
         rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (eye_distant)
 
     return rmse
