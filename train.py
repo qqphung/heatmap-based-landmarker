@@ -82,7 +82,7 @@ def compute_nme(preds, target, dataset, typeerr='inter-ocular'):
 
         eye_distant = None
         if isinstance(l, list):
-            eye_distant = np.linalg.norm(pts_gt[l[0]:l[1]].mean() - pts_gt[r[0]:r[1]].mean())
+            eye_distant = np.linalg.norm(pts_gt[l[0]:l[1]].mean(0) - pts_gt[r[0]:r[1]].mean(0))
         else:
             eye_distant = np.linalg.norm(pts_gt[l] - pts_gt[r])
         # rmse[i] = np.sum(np.linalg.norm(pts_pred - pts_gt, axis=1)) / (eye_distant)
