@@ -34,9 +34,10 @@ points_flip = (np.array(points_flip)-1).tolist()
 class F300WDataset(data.Dataset):
     TARGET_IMAGE_SIZE = (256, 256)
     
-    def __init__(self, data_dir, split, augment=False, transforms=None):
+    def __init__(self, data_dir, split, augment=False, transforms=None, ignore_outliners=True):
         self.data_dir = data_dir
         
+        self.ignore_outliners = ignore_outliners
         self.augment = augment
         self.transforms = transforms
         self.flip_aug = FaceLMHorizontalFlip(p=0.5, points_flip=points_flip)
@@ -98,13 +99,13 @@ class F300WDataset(data.Dataset):
 
 
         # If fail then get the default item
-        # if np.min(landmark[:,0]) < 0 or \
-        #    np.min(landmark[:,1]) < 0 or \
-        #    np.max(landmark[:,0]) >= img.shape[1]  or \
-        #    np.max(landmark[:,1]) >= img.shape[0] :
-        #    print("Get default itemmmmmmmmmmmmmmmmm!")
-        #    return self.__get_default_item()
-        # landmark[landmark < 0] = 0
+        # if self.ignore_outliners:
+        #     if np.min(landmark[:,0]) < 0 or \
+        #     np.min(landmark[:,1]) < 0 or \
+        #     np.max(landmark[:,0]) >= img.shape[1]  or \
+        #     np.max(landmark[:,1]) >= img.shape[0] :
+        #         print("Get default itemmmmmmmmmmmmmmmmm!")
+        #         return self.__get_default_item()
 
         # Round box in case box out of range
         x1, y1, x2, y2 = box
@@ -116,7 +117,7 @@ class F300WDataset(data.Dataset):
 
         if self.augment:
             # Flip augmentation
-            img, landmark = self.flip_aug(img, landmark)
+            # img, landmark = self.flip_aug(img, landmark)
 
             # Mask for invalid landmark
             mask_landmark = np.zeros_like(landmark)

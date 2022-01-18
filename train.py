@@ -275,8 +275,8 @@ def main(args):
         transforms=transform)
         val_dataset = LAPA106DataSet(img_dir=f'{args.val_dataroot}/images', anno_dir=f'{args.val_dataroot}/landmarks')
     elif args.dataset == "300w":
-        train_dataset = F300WDataset(data_dir=args.dataroot, split=args.train_split, augment=True, transforms=transform)
-        val_dataset = F300WDataset(data_dir=args.dataroot, split=args.val_split)
+        train_dataset = F300WDataset(data_dir=args.dataroot, split=args.train_split, augment=True, transforms=transform, ignore_outliners=True)
+        val_dataset = F300WDataset(data_dir=args.dataroot, split=args.val_split, ignore_outliners=False)
     print("No. train images", len(train_dataset))
     print("No. val images", len(val_dataset))
     # Dataloader
